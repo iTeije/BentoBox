@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>world.bentobox</groupId>
@@ -89,7 +89,7 @@
     <profiles>
         <profile>
             <!-- ci profile is activated if exist environment variable BUILD_NUMBER. -->
-            <!-- It replaces ${build.number} that is currently '-LOCAL' with 
+            <!-- It replaces ${build.number} that is currently '-LOCAL' with
                 correct build number from JENKINS machine. -->
             <id>ci</id>
             <activation>
@@ -103,13 +103,13 @@
             </properties>
         </profile>
         <profile>
-            <!-- Master profile is activated if exist environment variable 
+            <!-- Master profile is activated if exist environment variable
                 GIT_BRANCH and its value is origin/master. -->
-            <!-- It will replace 'revision' with '${build.version}' so it 
+            <!-- It will replace 'revision' with '${build.version}' so it
                 removes '-SNAPSHOT' string at the end. -->
-            <!-- Also, as this is release build, build number can be set 
+            <!-- Also, as this is release build, build number can be set
                 to empty string. -->
-            <!-- This profile will be used only if exist environment variable 
+            <!-- This profile will be used only if exist environment variable
                 GIT_BRANCH with value origin/master. -->
             <id>master</id>
             <activation>
@@ -133,20 +133,7 @@
             </properties>
             <build>
                 <plugins>
-                    <plugin>
-                        <groupId>org.sonarsource.scanner.maven</groupId>
-                        <artifactId>sonar-maven-plugin</artifactId>
-                        <!-- was <version>3.4.1.1168</version> -->
-                        <version>3.6.0.1398</version>
-                        <executions>
-                            <execution>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>sonar</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
+
                 </plugins>
             </build>
         </profile>
@@ -209,19 +196,19 @@
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
             <version>3.1.0</version>
-            <scope>test</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.powermock</groupId>
             <artifactId>powermock-module-junit4</artifactId>
             <version>${powermock.version}</version>
-            <scope>test</scope>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.powermock</groupId>
             <artifactId>powermock-api-mockito2</artifactId>
             <version>${powermock.version}</version>
-            <scope>test</scope>
+            <scope>compile</scope>
         </dependency>
         <!-- Database -->
         <dependency>
@@ -333,6 +320,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>2.22.2</version>
+                <configuration>
+                    <skipTests>true</skipTests>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -421,15 +411,15 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-deploy-plugin</artifactId>
                 <version>2.8.2</version>
-                <executions>
-                    <execution>
-                        <id>default-deploy</id>
-                        <phase>deploy</phase>
-                        <goals>
-                            <goal>deploy</goal>
-                        </goals>
-                    </execution>
-                </executions>
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>default-deploy</id>-->
+<!--                        <phase>deploy</phase>-->
+<!--                        <goals>-->
+<!--                            <goal>deploy</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
             </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>
