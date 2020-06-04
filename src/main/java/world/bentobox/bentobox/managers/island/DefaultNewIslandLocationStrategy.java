@@ -32,6 +32,9 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
 
     @Override
     public Location getNextLocation(World world) {
+        // Note:
+        // The only sync load I found was the isIsland method call
+
         Location last = plugin.getIslands().getLast(world);
 
         if (last == null) {
