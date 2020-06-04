@@ -11,10 +11,8 @@ import world.bentobox.bentobox.BentoBox;
 import world.bentobox.bentobox.util.Util;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The default strategy for generating locations for island
@@ -121,63 +119,24 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
         if (!plugin.getIWM().isUseOwnGenerator(world)) {
             // The old method call (Location#getBlock) caused the chunk to synchronously load
 
-            ExecutorService pool = Executors.newCachedThreadPool();
-
-            // Load chunk
-
-            AtomicReference<Result> result = new AtomicReference<>();
-
             return asyncRequest(location);
-
-//            return CompletableFuture.supplyAsync(location::getChunk, pool)
-//                    .exceptionally(throwable -> null)
-//                    .thenAccept(chunk -> {
-//                        Block block = chunk.getBlock(location.getBlockX(), location.getBlockY(), location.getBlockZ());
-//
-//                        if (Arrays.stream(BlockFace.values()).anyMatch(blockFace ->
-//                                !block.getRelative(blockFace).isEmpty() && !block.getRelative(blockFace).getType().equals(Material.WATER))) {
-//
-//                            // Block found
-//                            plugin.getIslands().createIsland(location);
-//                            result.set(Result.BLOCKS_IN_AREA);
-//                        }
-//                        result.set(Result.FREE);
-//
-//                    })
-//                    .thenApplyAsync(aVoid -> result.get()).join();
-
-//            try {
-//
-//                Chunk chunk = cChunk.get();
-//
-//                Block block = chunk.getBlock(location.getBlockX(), location.getBlockY(), location.getBlockZ());
-//
-//                if (Arrays.stream(BlockFace.values()).anyMatch(blockFace ->
-//                        !block.getRelative(blockFace).isEmpty() && !block.getRelative(blockFace).getType().equals(Material.WATER))) {
-//
-//                    // Block found
-//                    plugin.getIslands().createIsland(location);
-//                    return Result.BLOCKS_IN_AREA;
-//                }
-//                return Result.FREE;
-//
-//            } catch (InterruptedException | ExecutionException exception) {
-//                plugin.logStacktrace(exception.getCause());
-//            }
-
-
         }
 
         return Result.FREE;
     }
 
     private Result asyncRequest(Location location) {
-        // Not shortened due to readability
-        Chunk chunk = CompletableFuture.supplyAsync(() -> {
-            return location.getChunk();
-        }).thenApplyAsync(loadedChunk -> {
-            return loadedChunk;
-        }).join();
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+
+        // https://papermc.io/javadocs/paper/1.15/org/bukkit/World.html#getChunkAtAsync-int-int-boolean-
+
+        PaperLib.getChunkAtAsync(location.getWorld(), location.getBlockX(), location.getBlockZ())
+                .thenAcceptAsync(loadedChunk -> {
+                    cacheChunk(location, loadedChunk);
+                }, executorService)
+                .join();
+
+        Chunk chunk = getCachedChunk(location);
 
         Block block = chunk.getBlock(location.getBlockX(), location.getBlockY(), location.getBlockZ());
 
@@ -188,22 +147,20 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
             plugin.getIslands().createIsland(location);
             return Result.BLOCKS_IN_AREA;
         }
+
         return Result.FREE;
     }
 
-    private final HashMap<Location, Chunk> chunkCache = new HashMap<>();
+    private HashMap<Location, Chunk> chunkCache = new HashMap<>();
 
     public void cacheChunk(Location location, Chunk chunk) {
         chunkCache.put(location, chunk);
     }
 
-    public Chunk getChunk(Location location) {
+    public Chunk getCachedChunk(Location location) {
         return chunkCache.getOrDefault(location, null);
     }
 
-    public void removeCachedChunk(Location location) {
-        chunkCache.remove(location);
-    }
 
     /**
      * Finds the next free island spot based off the last known island Uses
