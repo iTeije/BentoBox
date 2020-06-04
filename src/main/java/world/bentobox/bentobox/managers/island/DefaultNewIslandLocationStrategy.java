@@ -1,10 +1,7 @@
 package world.bentobox.bentobox.managers.island;
 
 import io.papermc.lib.PaperLib;
-import org.bukkit.Chunk;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.World;
+import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import world.bentobox.bentobox.BentoBox;
@@ -12,7 +9,6 @@ import world.bentobox.bentobox.util.Util;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 /**
  * The default strategy for generating locations for island
@@ -54,8 +50,7 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
             last = nextGridLocation(last);
             result.put(r, result.getOrDefault(r, 0) + 1);
 
-
-            // The method call below causes an error
+            // The method call below caused an error (before)
             r = isIsland(last);
         }
 
@@ -118,42 +113,45 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
             // The old method call (Location#getBlock) caused the chunk to synchronously load
 
             // Load chunk
-            CompletableFuture<Chunk> chunkCompletableFuture = getChunk(location);
+            CompletableFuture<Object> cChunk = CompletableFuture.anyOf(PaperLib.getChunkAtAsync(location));
+            cChunk.thenAccept(o -> {
+                Chunk chunk = (Chunk) o;
+                cacheChunk(location, chunk);
+            });
 
-            try {
-                Chunk chunk = chunkCompletableFuture.get();
-                Block block = chunk.getBlock(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+            Chunk chunk = getChunk(location);
 
-                if (Arrays.stream(BlockFace.values()).anyMatch(blockFace ->
-                        !block.getRelative(blockFace).isEmpty() && !block.getRelative(blockFace).getType().equals(Material.WATER))) {
-
-                    // Block found
-                    plugin.getIslands().createIsland(location);
-                    return Result.BLOCKS_IN_AREA;
-                }
-            } catch (InterruptedException | ExecutionException exception) {
-                exception.printStackTrace();
-                plugin.logError("Couldn't load chunk.");
-                plugin.logStacktrace(exception.getCause());
-
-                return null;
+            // Keep looking for a cached chunk until its found
+            while (chunk == null) {
+                chunk = getChunk(location);
             }
 
+            Block block = chunk.getBlock(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+
+            if (Arrays.stream(BlockFace.values()).anyMatch(blockFace ->
+                    !block.getRelative(blockFace).isEmpty() && !block.getRelative(blockFace).getType().equals(Material.WATER))) {
+
+                // Block found
+                plugin.getIslands().createIsland(location);
+                return Result.BLOCKS_IN_AREA;
+            }
         }
 
         return Result.FREE;
     }
 
-    public CompletableFuture<Chunk> getChunk(Location location) {
-        // Avoiding unnecessary generation check
-        CompletableFuture<Chunk> completableFuture = PaperLib.getChunkAtAsync(location.getWorld(),
-                location.getBlockX() >> 4,
-                location.getBlockZ() >> 4)
-                .exceptionally(throwable -> {
-                    plugin.logStacktrace(throwable);
-                    return null;
-                });
-        return completableFuture;
+    private final HashMap<Location, Chunk> chunkCache = new HashMap<>();
+
+    public void cacheChunk(Location location, Chunk chunk) {
+        chunkCache.put(location, chunk);
+    }
+
+    public Chunk getChunk(Location location) {
+        return chunkCache.getOrDefault(location, null);
+    }
+
+    public void removeCachedChunk(Location location) {
+        chunkCache.remove(location);
     }
 
     /**
