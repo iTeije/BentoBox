@@ -1,7 +1,10 @@
 package world.bentobox.bentobox.managers.island;
 
 import io.papermc.lib.PaperLib;
-import org.bukkit.*;
+import org.bukkit.Chunk;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import world.bentobox.bentobox.BentoBox;
@@ -9,6 +12,9 @@ import world.bentobox.bentobox.util.Util;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The default strategy for generating locations for island
@@ -53,7 +59,7 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
             last = nextGridLocation(last);
             result.put(r, result.getOrDefault(r, 0) + 1);
 
-            // The method call below caused an error (before)
+            // The method call below caused an error
             r = isIsland(last);
         }
 
@@ -115,31 +121,73 @@ public class DefaultNewIslandLocationStrategy implements NewIslandLocationStrate
         if (!plugin.getIWM().isUseOwnGenerator(world)) {
             // The old method call (Location#getBlock) caused the chunk to synchronously load
 
+            ExecutorService pool = Executors.newCachedThreadPool();
+
             // Load chunk
-            CompletableFuture<Object> cChunk = CompletableFuture.anyOf(PaperLib.getChunkAtAsync(location));
-            cChunk.thenAccept(o -> {
-                Chunk chunk = (Chunk) o;
-                cacheChunk(location, chunk);
-            });
 
-            Chunk chunk = getChunk(location);
+            AtomicReference<Result> result = new AtomicReference<>();
 
-            // Keep looking for a cached chunk until its found
-            while (chunk == null) {
-                chunk = getChunk(location);
-            }
+            return asyncRequest(location);
 
-            Block block = chunk.getBlock(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+//            return CompletableFuture.supplyAsync(location::getChunk, pool)
+//                    .exceptionally(throwable -> null)
+//                    .thenAccept(chunk -> {
+//                        Block block = chunk.getBlock(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+//
+//                        if (Arrays.stream(BlockFace.values()).anyMatch(blockFace ->
+//                                !block.getRelative(blockFace).isEmpty() && !block.getRelative(blockFace).getType().equals(Material.WATER))) {
+//
+//                            // Block found
+//                            plugin.getIslands().createIsland(location);
+//                            result.set(Result.BLOCKS_IN_AREA);
+//                        }
+//                        result.set(Result.FREE);
+//
+//                    })
+//                    .thenApplyAsync(aVoid -> result.get()).join();
 
-            if (Arrays.stream(BlockFace.values()).anyMatch(blockFace ->
-                    !block.getRelative(blockFace).isEmpty() && !block.getRelative(blockFace).getType().equals(Material.WATER))) {
+//            try {
+//
+//                Chunk chunk = cChunk.get();
+//
+//                Block block = chunk.getBlock(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+//
+//                if (Arrays.stream(BlockFace.values()).anyMatch(blockFace ->
+//                        !block.getRelative(blockFace).isEmpty() && !block.getRelative(blockFace).getType().equals(Material.WATER))) {
+//
+//                    // Block found
+//                    plugin.getIslands().createIsland(location);
+//                    return Result.BLOCKS_IN_AREA;
+//                }
+//                return Result.FREE;
+//
+//            } catch (InterruptedException | ExecutionException exception) {
+//                plugin.logStacktrace(exception.getCause());
+//            }
 
-                // Block found
-                plugin.getIslands().createIsland(location);
-                return Result.BLOCKS_IN_AREA;
-            }
+
         }
 
+        return Result.FREE;
+    }
+
+    private Result asyncRequest(Location location) {
+        // Not shortened due to readability
+        Chunk chunk = CompletableFuture.supplyAsync(() -> {
+            return location.getChunk();
+        }).thenApplyAsync(loadedChunk -> {
+            return loadedChunk;
+        }).join();
+
+        Block block = chunk.getBlock(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+
+        if (Arrays.stream(BlockFace.values()).anyMatch(blockFace ->
+                !block.getRelative(blockFace).isEmpty() && !block.getRelative(blockFace).getType().equals(Material.WATER))) {
+
+            // Block found
+            plugin.getIslands().createIsland(location);
+            return Result.BLOCKS_IN_AREA;
+        }
         return Result.FREE;
     }
 
